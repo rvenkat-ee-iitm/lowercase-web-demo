@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lowercase Web App</title>
+
+    <script>
+        async function sendText() {
+            const text = document.getElementById("inputText").value;
+
+            const response = await fetch("/lowercase", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ text: text })
+            });
+
+            const data = await response.json();
+
+            if (data.lowercase) {
+                document.getElementById("result").innerText =
+                    "Lowercase: " + data.lowercase;
+            } else {
+                document.getElementById("result").innerText =
+                    "Error: " + data.error;
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <h2>Lowercase Demo (Web)</h2>
+
+    <input type="text" id="inputText" placeholder="Enter text" size="40">
+    <br><br>
+
+    <button onclick="sendText()">Convert to lowercase</button>
+
+    <p id="result"></p>
+</body>
+</html>
+
