@@ -1,22 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Answer Feedback</title>
 </head>
 <body>
 
-{% if correct %}
-    <h2>✔ Correct!</h2>
-{% else %}
-    <h2>❌ Incorrect</h2>
-    <p><strong>Correct answer:</strong> {{ correct_label }}</p>
-{% endif %}
+    {% if correct %}
+        <h2>✔ Correct!</h2>
+    {% else %}
+        <h2>❌ Incorrect</h2>
+        <p>
+            <strong>Correct answer:</strong> {{ correct_label }}
+        </p>
+    {% endif %}
 
-<p>{{ explanation }}</p>
+    <p>{{ explanation }}</p>
 
-<form action="{{ url_for('question') }}">
-    <button type="submit">Next Question</button>
-</form>
+    <!-- 
+        IMPORTANT:
+        - method must be GET
+        - route must be 'question'
+        - no hidden fields (state is in session)
+    -->
+    <form method="GET" action="{{ url_for('question') }}">
+        <button type="submit">Next Question</button>
+    </form>
 
 </body>
 </html>
