@@ -1,67 +1,14 @@
+import os
 from flask import Flask, request, jsonify, render_template, session
+from google import genai
 
 app = Flask(__name__)
+app.secret_key = "temporary-secret-key"
 
 # --------------------------------
-# REQUIRED for sessions
+# Gemini client
 # --------------------------------
-app.secret_key = "temporary-secret-key"  # replace later for production
-
-# --------------------------------
-# Static Question Bank
-# --------------------------------
-QUESTIONS = [
-    {
-        "question": "Choose the correct sentence.",
-        "options": {
-            "A": "She don't like coffee.",
-            "B": "She doesn't like coffee.",
-            "C": "She didn't likes coffee.",
-            "D": "She don't likes coffee."
-        },
-        "correct": "B"
-    },
-    {
-        "question": "What does 'meticulous' most nearly mean?",
-        "options": {
-            "A": "Careless",
-            "B": "Quick",
-            "C": "Very careful",
-            "D": "Aggressive"
-        },
-        "correct": "C"
-    },
-    {
-        "question": "Identify the correct usage.",
-        "options": {
-            "A": "He is senior than me.",
-            "B": "He is senior to me.",
-            "C": "He is senior from me.",
-            "D": "He is senior over me."
-        },
-        "correct": "B"
-    },
-    {
-        "question": "Choose the best replacement: 'She spoke ______.'",
-        "options": {
-            "A": "confident",
-            "B": "confidence",
-            "C": "confidently",
-            "D": "confidencing"
-        },
-        "correct": "C"
-    },
-    {
-        "question": "Which sentence is grammatically correct?",
-        "options": {
-            "A": "Neither of the answers are correct.",
-            "B": "Neither of the answers is correct.",
-            "C": "Neither answers are correct.",
-            "D": "Neither answer were correct."
-        },
-        "correct": "B"
-    }
-]
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 # --------------------------------
 # Helpers
@@ -70,6 +17,41 @@ def init_session():
     if "index" not in session:
         session["index"] = 0
         session["score"] = 0
+
+def generate_question(difficulty=5):
+    prompt = f"""
+You are creating ONE multiple-choice English proficiency question.
+
+Difficulty level: {difficulty} (1 = very easy, 10 = very hard)
+
+Rules:
+- Focus ONLY on grammar or word meaning
+- Everyday contexts (not academic, not research)
+- Exactly 4 options labeled A, B, C, D
+- Only ONE correct answer
+
+Return EXACTLY in this JSON format:
+
+{{
+  "question": "...",
+  "options": {{
+    "A": "...",
+    "B": "...",
+    "C": "...",
+    "D": "..."
+  }},
+  "correct": "A",
+  "explanation": "..."
+}}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-2.5-pro",
+        contents=prompt,
+        config={"response_mime_type": "application/json"}
+    )
+
+    return response.parsed
 
 # --------------------------------
 # Routes
@@ -83,17 +65,20 @@ def home():
 def get_question():
     init_session()
 
-    idx = session["index"]
-    if idx >= len(QUESTIONS):
+    if session["index"] >= 5:
         return jsonify({"done": True})
 
-    q = QUESTIONS[idx]
+    q = generate_question(difficulty=5)
+
+    # store correct answer for this question
+    session["current_correct"] = q["correct"]
+
     return jsonify({
         "done": False,
         "question": q["question"],
         "options": q["options"],
-        "number": idx + 1,
-        "total": len(QUESTIONS)
+        "number": session["index"] + 1,
+        "total": 5
     })
 
 @app.route("/answer", methods=["POST"])
@@ -103,10 +88,7 @@ def submit_answer():
     data = request.get_json()
     selected = data.get("answer")
 
-    idx = session["index"]
-    correct = QUESTIONS[idx]["correct"]
-
-    if selected == correct:
+    if selected == session.get("current_correct"):
         session["score"] += 1
 
     session["index"] += 1
@@ -114,17 +96,15 @@ def submit_answer():
 
 @app.route("/result")
 def result():
-    init_session()
     return jsonify({
         "score": session["score"],
-        "total": len(QUESTIONS)
+        "total": 5
     })
 
 # --------------------------------
 # Run
 # --------------------------------
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
 
