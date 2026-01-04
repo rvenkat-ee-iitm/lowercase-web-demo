@@ -1,3 +1,4 @@
-flask
-google-genai
+flask>=3.0.0
+google-genai>=0.5.0
+google-api-core>=2.17.0
 
