@@ -132,14 +132,18 @@ def shuffle_options(correct, distractors):
 
 @app.route("/", methods=["GET", "POST"])
 def start():
-    session.clear()
-    session["difficulty"] = 4
-    session["qno"] = 1
-    session["history"] = []
-    session["categories"] = random.sample(
-        QUESTION_CATEGORIES * 3, TOTAL_QUESTIONS
-    )
+    if request.method == "POST":
+        session.clear()
+        session["difficulty"] = 4
+        session["qno"] = 1
+        session["history"] = []
+        session["categories"] = random.sample(
+            QUESTION_CATEGORIES * 3, TOTAL_QUESTIONS
+        )
+        return redirect(url_for("question"))  # 🔑 THIS WAS MISSING
+
     return render_template("start.html")
+
 
 @app.route("/question", methods=["GET"])
 def question():
