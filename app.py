@@ -2,24 +2,23 @@ import os
 import time
 import json
 import random
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from google import genai
-from google.api_core.exceptions import ServiceUnavailable, ResourceExhausted
 
-# ==========================================================
-# FLASK APP SETUP
-# ==========================================================
+# =====================================================
+# FLASK SETUP
+# =====================================================
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
-# ==========================================================
+# =====================================================
 # GEMINI CLIENT
-# ==========================================================
+# =====================================================
 client = genai.Client()
 
-# ==========================================================
-# CONTROLLER-OWNED CONSTANTS (FROM IPYNB)
-# ==========================================================
+# =====================================================
+# QUESTION CATEGORIES (CONTROLLER-OWNED)
+# =====================================================
 QUESTION_CATEGORIES = [
     "grammar",
     "vocabulary_meaning",
@@ -30,9 +29,9 @@ QUESTION_CATEGORIES = [
 
 TOTAL_QUESTIONS = 10
 
-# ==========================================================
-# SAFE GEMINI CALL (UNCHANGED LOGIC)
-# ==========================================================
+# =====================================================
+# SAFE GEMINI CALL
+# =====================================================
 def call_gemini(prompt):
     delay = 2
     for attempt in range(4):
@@ -53,103 +52,72 @@ def call_gemini(prompt):
             if response.candidates:
                 return response.candidates[0].content.parts[0].text.strip()
 
-            raise ValueError("Empty Gemini response")
-
-        except (ServiceUnavailable, ResourceExhausted):
+        except Exception:
             continue
 
-    raise RuntimeError("Gemini overloaded")
+    raise RuntimeError("Gemini unavailable")
 
-# ==========================================================
-# NORMALIZE GEMINI OUTPUT (IPYNB IDENTICAL)
-# ==========================================================
+# =====================================================
+# NORMALIZE GEMINI OUTPUT (ROBUST)
+# =====================================================
 def normalize_question(data):
+    # Schema A
     if "distractors" in data:
         return {
             "question": data["question"],
             "correct": data["correct_answer"],
             "distractors": data["distractors"],
-            "explanation": data["explanation"]
+            "explanation": data.get("explanation", "")
         }
 
+    # Schema B
     if "options" in data:
-        correct_text = data["options"][data["correct_answer"]]
-        distractors = [
-            v for k, v in data["options"].items()
-            if k != data["correct_answer"]
-        ]
+        label = data["correct_answer"]
+        options = data["options"]
         return {
             "question": data["question"],
-            "correct": correct_text,
-            "distractors": distractors,
-            "explanation": data["explanation"]
+            "correct": options[label],
+            "distractors": [v for k, v in options.items() if k != label],
+            "explanation": data.get("explanation", "")
         }
 
     raise ValueError("Unrecognized Gemini schema")
 
-# ==========================================================
-# QUESTION GENERATOR (PROMPT IS IPYNB-EQUIVALENT)
-# ==========================================================
+# =====================================================
+# GENERATE QUESTION
+# =====================================================
 def generate_question(category, difficulty, qno):
     prompt = f"""
 You are generating ONE English proficiency multiple-choice question.
 
 Category: {category}
 Difficulty Level: {difficulty} (1 = beginner, 10 = expert)
-Question number: {qno}
 
 CATEGORY DEFINITIONS:
-- grammar: grammatical correctness, tense, agreement, clauses
-- vocabulary_meaning: precise word meaning, nuance, near-synonyms
-- sentence_paraphrase: selecting closest equivalent meaning
-- inference: implied meaning, intent, conclusions
-- error_detection: identify the incorrect part of a sentence
+- grammar
+- vocabulary_meaning
+- sentence_paraphrase
+- inference
+- error_detection
 
 DIFFICULTY GUIDELINES:
-1–3: simple, short, obvious distractors
-4–6: moderate complexity, believable distractors
-7–8: subtle nuance, close options
-9–10: multi-clause reasoning, deep inference
+1–3: easy
+4–6: medium
+7–8: hard
+9–10: expert
 
-IMPORTANT:
-This question MUST be clearly harder than level {max(1, difficulty-1)}
-and clearly easier than level {min(10, difficulty+1)}.
-Regenerate internally until this constraint is met.
+Use natural daily-life contexts.
 
-CONTEXT:
-Use natural human contexts: daily life, workplace, travel, conversation.
-Avoid academic or lab-style questions.
-
-OUTPUT JSON using ONE of these schemas:
-
-Schema A:
-{{
-  "question": "...",
-  "correct_answer": "...",
-  "distractors": ["...", "...", "..."],
-  "explanation": "..."
-}}
-
-Schema B:
-{{
-  "question": "...",
-  "options": {{
-      "A": "...",
-      "B": "...",
-      "C": "...",
-      "D": "..."
-  }},
-  "correct_answer": "A/B/C/D",
-  "explanation": "..."
-}}
+Return JSON ONLY.
 """
+
     raw = call_gemini(prompt)
     data = json.loads(raw)
     return normalize_question(data)
 
-# ==========================================================
-# SHUFFLE OPTIONS (NO BIAS)
-# ==========================================================
+# =====================================================
+# SHUFFLE OPTIONS
+# =====================================================
 def shuffle_options(correct, distractors):
     options = distractors + [correct]
     random.shuffle(options)
@@ -158,73 +126,69 @@ def shuffle_options(correct, distractors):
     correct_label = next(k for k, v in option_map.items() if v == correct)
     return option_map, correct_label
 
-# ==========================================================
+# =====================================================
 # ROUTES
-# ==========================================================
-@app.route("/")
+# =====================================================
+
+@app.route("/", methods=["GET", "POST"])
 def start():
     session.clear()
     session["difficulty"] = 4
-    session["q_index"] = 0
+    session["qno"] = 1
     session["history"] = []
-
-    seq = random.sample(QUESTION_CATEGORIES, len(QUESTION_CATEGORIES))
-    while len(seq) < TOTAL_QUESTIONS:
-        seq += random.sample(QUESTION_CATEGORIES, len(QUESTION_CATEGORIES))
-
-    session["categories"] = seq
+    session["categories"] = random.sample(
+        QUESTION_CATEGORIES * 3, TOTAL_QUESTIONS
+    )
     return render_template("start.html")
 
-@app.route("/question")
+@app.route("/question", methods=["GET"])
 def question():
-    i = session["q_index"]
-    if i >= TOTAL_QUESTIONS:
+    if session.get("qno", 1) > TOTAL_QUESTIONS:
         return redirect(url_for("result"))
 
-    category = session["categories"][i]
+    category = session["categories"][session["qno"] - 1]
     difficulty = session["difficulty"]
 
-    q = generate_question(category, difficulty, i + 1)
-    options, correct_label = shuffle_options(q["correct"], q["distractors"])
+    q = generate_question(category, difficulty, session["qno"])
+    options, correct_label = shuffle_options(
+        q["correct"], q["distractors"]
+    )
 
     session["current"] = {
         "correct_label": correct_label,
-        "difficulty": difficulty,
         "explanation": q["explanation"]
     }
 
     return render_template(
         "question.html",
-        q_index=i,
-        question=q["question"],
-        options=options,
+        qno=session["qno"],
         difficulty=difficulty,
-        category=category
+        q={"question": q["question"], "options": options}
     )
 
 @app.route("/answer", methods=["POST"])
 def answer():
-    user_ans = request.form.get("answer")
-    correct = session["current"]["correct_label"]
-    was_correct = user_ans == correct
+    user_answer = request.form.get("answer")
+    correct_label = session["current"]["correct_label"]
 
-    session["history"].append((session["difficulty"], was_correct))
+    correct = user_answer == correct_label
+    session["history"].append((session["difficulty"], correct))
 
-    if was_correct:
+    if correct:
         session["difficulty"] = min(10, session["difficulty"] + 1)
     else:
         session["difficulty"] = max(1, session["difficulty"] - 1)
 
-    session["q_index"] += 1
+    session["qno"] += 1
 
     return render_template(
         "feedback.html",
-        correct=was_correct,
-        correct_label=correct,
+        correct=correct,
+        correct_label=correct_label,
         explanation=session["current"]["explanation"]
     )
 
-@app.route("/result")
+@app.route("/result", methods=["GET"])
 def result():
     history = session["history"]
     correct = sum(1 for _, c in history if c)
@@ -233,15 +197,15 @@ def result():
 
     return render_template(
         "result.html",
-        accuracy=round(100 * correct / len(history), 1),
         avg_level=avg_level,
+        accuracy=round(100 * correct / len(history), 1),
         score=score
     )
 
-# ==========================================================
-# ENTRYPOINT (RENDER-COMPATIBLE)
-# ==========================================================
+# =====================================================
+# RENDER PORT BINDING
+# =====================================================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
 
