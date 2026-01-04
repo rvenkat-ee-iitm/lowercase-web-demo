@@ -1,34 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Question {{ q_index + 1 }}</title>
+    <title>Question {{ qno }}</title>
 </head>
 <body>
 
-    <h2>
-        Question {{ q_index + 1 }} of {{ total }}
-        <br>
-        <small>
-            Difficulty: {{ difficulty }} |
-            Category: {{ category }}
-        </small>
-    </h2>
+<h2>Question {{ qno }} (Difficulty {{ difficulty }})</h2>
 
-    <p>{{ question }}</p>
+<p>{{ q.question }}</p>
 
-    <form method="POST" action="{{ url_for('answer') }}">
-        {% for key, value in options.items() %}
-            <label>
-                <input type="radio" name="answer" value="{{ key }}" required>
-                {{ key }}) {{ value }}
-            </label>
-            <br>
-        {% endfor %}
+<form method="post" action="{{ url_for('answer') }}">
+    {% for key, value in q.options.items() %}
+        <label>
+            <input type="radio" name="answer" value="{{ key }}" required>
+            {{ key }}) {{ value }}
+        </label><br>
+    {% endfor %}
 
-        <br>
-        <button type="submit">Submit</button>
-    </form>
+    <br>
+    <button type="submit">Submit</button>
+</form>
 
 </body>
 </html>
