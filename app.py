@@ -5,7 +5,6 @@ import json
 from flask import Flask, render_template, request, redirect, url_for, session
 
 from google import genai
-from google.api_core.exceptions import ServiceUnavailable, ResourceExhausted
 
 # ======================================================
 # Flask setup
@@ -54,7 +53,8 @@ def call_gemini(prompt):
             if response.candidates and response.candidates[0].content.parts:
                 return response.candidates[0].content.parts[0].text.strip()
 
-        except (ServiceUnavailable, ResourceExhausted):
+        except Exception as e:
+            print("Gemini error:", e)
             continue
 
     return None
