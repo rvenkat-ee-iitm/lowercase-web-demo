@@ -1,20 +1,27 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>English Proficiency Test</title>
+    <meta charset="UTF-8">
+    <title>Adaptive English Proficiency Test</title>
 </head>
 <body>
 
-<h1>Adaptive English Proficiency Test</h1>
+    <h1>Adaptive English Proficiency Test</h1>
 
-<p>
-This test adapts its difficulty based on your answers.
-You will be asked 10 questions.
-</p>
+    <p>
+        This test adapts its difficulty based on your answers.<br>
+        You will be asked <strong>10 questions</strong> covering grammar,
+        vocabulary, meaning, and inference.
+    </p>
 
-<form action="{{ url_for('start') }}">
-    <button type="submit">Start Test</button>
-</form>
+    <!-- 
+        IMPORTANT:
+        - method="POST" (not GET)
+        - action must match the Flask route name exactly
+    -->
+    <form method="POST" action="{{ url_for('start') }}">
+        <button type="submit">Start Test</button>
+    </form>
 
 </body>
 </html>
