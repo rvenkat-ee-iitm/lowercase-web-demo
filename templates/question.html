@@ -7,19 +7,53 @@
 
 <h2>Question {{ qno }} (Difficulty {{ difficulty }})</h2>
 
-<p>{{ q.question }}</p>
+<p>{{ question }}</p>
 
-<form method="post" action="{{ url_for('answer') }}">
-    {% for key, value in q.options.items() %}
+<form method="post">
+
+    {% for key, value in options.items() %}
         <label>
-            <input type="radio" name="answer" value="{{ key }}" required>
+            <input
+                type="radio"
+                name="answer"
+                value="{{ key }}"
+                {% if selected %}
+                    disabled
+                {% endif %}
+                {% if selected == key %}
+                    checked
+                {% endif %}
+                required
+            >
             {{ key }}) {{ value }}
-        </label><br>
+        </label>
+        <br>
     {% endfor %}
 
     <br>
-    <button type="submit">Submit</button>
+
+    {% if not feedback %}
+        <button type="submit">Submit</button>
+    {% endif %}
+
 </form>
+
+{% if feedback %}
+    <hr>
+
+    {% if correct %}
+        <h3 style="color:green;">✔ Correct!</h3>
+    {% else %}
+        <h3 style="color:red;">❌ Incorrect</h3>
+        <p><strong>Correct answer:</strong> {{ correct_label }}</p>
+    {% endif %}
+
+    <p>{{ explanation }}</p>
+
+    <form method="get">
+        <button type="submit">Next Question</button>
+    </form>
+{% endif %}
 
 </body>
 </html>
