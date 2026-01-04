@@ -5,7 +5,6 @@ import random
 from flask import Flask, render_template, request, redirect, url_for, session
 
 from google import genai
-from google.api_core.exceptions import ServiceUnavailable, ResourceExhausted
 
 # ======================================================
 # FLASK APP SETUP
