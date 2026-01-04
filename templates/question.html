@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Question {{ qno }}</title>
+</head>
+<body>
+
+<h2>Question {{ qno }} (Difficulty {{ difficulty }})</h2>
+
+<p>{{ q.question }}</p>
+
+<form method="post" action="{{ url_for('answer') }}">
+    {% for key, value in q.options.items() %}
+        <label>
+            <input type="radio" name="answer" value="{{ key }}" required>
+            {{ key }}) {{ value }}
+        </label><br>
+    {% endfor %}
+
+    <br>
+    <button type="submit">Submit</button>
+</form>
+
+</body>
+</html>
+

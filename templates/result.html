@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Result</title>
+</head>
+<body>
+
+<h1>Test Completed</h1>
+
+<p><strong>Average Ability Level:</strong> {{ avg_level }}</p>
+<p><strong>Accuracy:</strong> {{ accuracy }}%</p>
+<p><strong>Proficiency Score:</strong> {{ score }} / 100</p>
+
+<form action="{{ url_for('start') }}">
+    <button type="submit">Retake Test</button>
+</form>
+
+</body>
+</html>
+
