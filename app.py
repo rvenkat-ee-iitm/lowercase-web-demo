@@ -177,75 +177,51 @@ def start():
 
     return render_template("start.html")
 
-@app.route("/question", methods=["GET", "POST"])
+
+@app.route("/question")
 def question():
+    if session["qno"] >= TOTAL_QUESTIONS:
+        return redirect(url_for("result"))
 
-    # -----------------------------
-    # INITIALIZE SESSION STATE
-    # -----------------------------
-    if "qno" not in session:
-        return redirect(url_for("start"))
-
-    feedback = False
-    correct = False
-    correct_label = None
-    explanation = None
-    selected = None
-
-    # -----------------------------
-    # HANDLE ANSWER SUBMISSION
-    # -----------------------------
-    if request.method == "POST":
-        selected = request.form.get("answer")
-
-        correct_label = session["correct_label"]
-        explanation = session["explanation"]
-
-        correct = (selected == correct_label)
-        feedback = True
-
-        # track performance
-        session["history"].append((session["difficulty"], correct))
-
-        # adapt difficulty
-        if correct:
-            session["difficulty"] = min(10, session["difficulty"] + 1)
-        else:
-            session["difficulty"] = max(1, session["difficulty"] - 1)
-
-        session["qno"] += 1
-
-        # test complete?
-        if session["qno"] > session["total_questions"]:
-            return redirect(url_for("result"))
-
-    # -----------------------------
-    # GENERATE QUESTION (GET OR AFTER POST)
-    # -----------------------------
-    category = session["category_sequence"][session["qno"] - 1]
+    category = session["categories"][session["qno"] % len(QUESTION_CATEGORIES)]
     difficulty = session["difficulty"]
 
-    q = generate_question(category, difficulty, session["qno"])
+    q = generate_question(category, difficulty, session["qno"] + 1)
 
     options, correct_label = shuffle_options(
         q["correct_answer"], q["distractors"]
     )
 
-    # persist correct answer for POST
-    session["correct_label"] = correct_label
-    session["explanation"] = q["explanation"]
+    session["current_correct"] = correct_label
+    session["current_explanation"] = q["explanation"]
+    session["qno"] += 1
 
     return render_template(
         "question.html",
         qno=session["qno"],
         difficulty=difficulty,
-        question=q["question"],
-        options=options,
-        feedback=feedback,
+        q={"question": q["question"], "options": options}
+    )
+
+
+@app.route("/answer", methods=["POST"])
+def answer():
+    user_ans = request.form.get("answer")
+    correct_label = session.get("current_correct")
+
+    correct = user_ans == correct_label
+    session["history"].append((session["difficulty"], correct))
+
+    if correct:
+        session["difficulty"] = min(10, session["difficulty"] + 1)
+    else:
+        session["difficulty"] = max(1, session["difficulty"] - 1)
+
+    return render_template(
+        "feedback.html",
         correct=correct,
         correct_label=correct_label,
-        explanation=explanation,
-        selected=selected
+        explanation=session.get("current_explanation", "")
     )
 
 
