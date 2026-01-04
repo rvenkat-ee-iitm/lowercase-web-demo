@@ -41,7 +41,7 @@ def call_gemini(prompt):
                 delay *= 2
 
             response = client.models.generate_content(
-                model="gemini-2.5-pro",
+                model="gemini-2.5-flash-lite",
                 contents=prompt,
                 config={"response_mime_type": "application/json"}
             )
